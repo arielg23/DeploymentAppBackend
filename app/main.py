@@ -61,11 +61,4 @@ app.include_router(admin_router)
 
 @app.get("/health")
 async def health():
-    from sqlalchemy import text
-    from core.database import AsyncSessionLocal
-    try:
-        async with AsyncSessionLocal() as db:
-            await db.execute(text("SELECT 1"))
-        return {"status": "ok", "db": "ok"}
-    except Exception as e:
-        return {"status": "error", "db": str(e)}
+    return {"status": "ok"}
