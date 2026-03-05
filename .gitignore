@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Environment files (contain secrets)
+.env
+!.env.example
+
+# Alembic local state
+app/alembic/versions/__pycache__/
+
+# Node / React Native
+mobile/node_modules/
+mobile/.expo/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/android/app/.cxx/
+mobile/android/app/smartlock.keystore
+mobile/android/gradle.properties.local
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/.bundle/
+
+# Gradle build cache (redirected outside project)
+C:/tmp/SLBuild/
+
+# APK output
+*.apk
+*.aab
+
+# Metro bundler cache
+mobile/.metro-cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db

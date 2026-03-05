@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+    <a href="/admin/uploads" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+    <h4 class="mb-0">New Upload</h4>
+</div>
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+<div class="card" style="max-width:520px">
+    <div class="card-body">
+        <form method="post" action="/admin/uploads/new" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Site</label>
+                <select name="site_id" class="form-select" required>
+                    <option value="">-- select site --</option>
+                    {% for site in sites %}
+                    <option value="{{ site.site_id }}">{{ site.site_name }} ({{ site.site_id }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Excel File</label>
+                <input type="file" name="file" class="form-control" accept=".xlsx,.xls" required>
+                <div class="form-text">Required columns: site_id, unit_id, unit_name, sequence. Optional: customer_name, customer_id</div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Upload Dataset</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

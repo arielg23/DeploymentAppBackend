@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+    <a href="/admin/uploads" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+    <h4 class="mb-0">Upload Detail</h4>
+    <span class="badge bg-{% if upload.status.value == 'ACTIVE' %}success{% elif upload.status.value == 'COMPLETE' %}secondary{% else %}warning text-dark{% endif %} ms-3 fs-6">{{ upload.status.value }}</span>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="card text-center p-3"><div class="text-muted small">Total Units</div><div class="fs-3 fw-bold">{{ total }}</div></div></div>
+    <div class="col-md-3"><div class="card text-center p-3"><div class="text-muted small">Assigned</div><div class="fs-3 fw-bold text-success">{{ assigned }}</div></div></div>
+    <div class="col-md-3"><div class="card text-center p-3"><div class="text-muted small">Skipped</div><div class="fs-3 fw-bold text-warning">{{ skipped }}</div></div></div>
+    <div class="col-md-3"><div class="card text-center p-3"><div class="text-muted small">Conflicts</div><div class="fs-3 fw-bold text-danger">{{ conflicts }}</div></div></div>
+</div>
+<div class="card mb-3">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Upload ID</dt><dd class="col-sm-9"><code>{{ upload.upload_id }}</code></dd>
+            <dt class="col-sm-3">Site</dt><dd class="col-sm-9">{{ upload.site_id }}</dd>
+            <dt class="col-sm-3">Uploaded At</dt><dd class="col-sm-9">{{ upload.uploaded_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+        </dl>
+    </div>
+</div>
+<div class="d-flex gap-2 flex-wrap">
+    {% if upload.status.value == 'INACTIVE' %}
+    <form method="post" action="/admin/uploads/{{ upload.upload_id }}/activate">
+        <button type="submit" class="btn btn-success" onclick="return confirm('Activate this upload? Any currently ACTIVE upload for this site will be blocked by the database constraint.')">
+            <i class="bi bi-play-fill me-1"></i>Activate
+        </button>
+    </form>
+    {% elif upload.status.value == 'ACTIVE' %}
+    <form method="post" action="/admin/uploads/{{ upload.upload_id }}/complete">
+        <button type="submit" class="btn btn-secondary" onclick="return confirm('Mark run as COMPLETE? This will allow new uploads for this site.')">
+            <i class="bi bi-check2-all me-1"></i>Mark Complete
+        </button>
+    </form>
+    {% endif %}
+    <a href="/admin/uploads/{{ upload.upload_id }}/export" class="btn btn-outline-primary">
+        <i class="bi bi-download me-1"></i>Download CSV
+    </a>
+</div>
+{% endblock %}

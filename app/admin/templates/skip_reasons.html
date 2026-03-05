@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">Skip Reasons</h4>
+</div>
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header fw-semibold">Add Skip Reason</div>
+            <div class="card-body">
+                <form method="post" action="/admin/skip-reasons/new">
+                    <div class="mb-2"><input type="text" name="label" class="form-control form-control-sm" placeholder="e.g. Unit not accessible" required></div>
+                    <button type="submit" class="btn btn-sm btn-primary w-100">Add Reason</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <table class="table table-hover mb-0">
+                <thead class="table-light"><tr><th>Label</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                {% for reason in reasons %}
+                <tr>
+                    <td>{{ reason.label }}</td>
+                    <td><span class="badge bg-{% if reason.active %}success{% else %}secondary{% endif %}">{% if reason.active %}Active{% else %}Inactive{% endif %}</span></td>
+                    <td>
+                        <form method="post" action="/admin/skip-reasons/{{ reason.id }}/toggle" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-{% if reason.active %}outline-warning{% else %}outline-success{% endif %}">
+                                {% if reason.active %}Disable{% else %}Enable{% endif %}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="text-center text-muted py-4">No skip reasons configured.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
