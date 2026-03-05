@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await _seed_admin()
+    try:
+        await _seed_admin()
+    except Exception as e:
+        logger.error("Admin seed failed (non-fatal): %s", e)
     yield
 
 
