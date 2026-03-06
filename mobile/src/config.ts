@@ -1,2 +1,2 @@
-// Set API_BASE_URL to your Railway deployment URL before building the release APK
-export const API_BASE_URL = 'http://localhost:8000';
+// API base URL - points to Railway deployment
+export const API_BASE_URL = 'https://deploymentappbackend-production.up.railway.app';
