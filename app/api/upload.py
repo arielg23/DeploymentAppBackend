@@ -68,6 +68,7 @@ async def get_units(
             sequence=u.sequence,
             customer_name=u.customer_name,
             customer_id=u.customer_id,
+            barcode=u.barcode,
             assignment_status=a.status.value if a else None,
             dev_eui_normalized=a.dev_eui_normalized if a else None,
             is_skipped=u.unit_id in skipped_units,
@@ -142,4 +143,46 @@ async def export_csv(
         iter([csv_content]),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=upload_{upload_id}.csv"},
+    )
+
+
+@router.get("/{upload_id}/barcode/{barcode_value}", response_model=UnitResponse)
+async def lookup_by_barcode(
+    upload_id: uuid.UUID,
+    barcode_value: str,
+    technician: Technician = Depends(get_current_technician),
+    db: AsyncSession = Depends(get_db),
+):
+    upload = await _get_upload_or_404(db, upload_id)
+    await verify_site_access(upload.site_id, technician, db)
+
+    result = await db.execute(
+        select(Unit).where(Unit.upload_id == upload_id, Unit.barcode == barcode_value)
+    )
+    unit = result.scalar_one_or_none()
+    if not unit:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Barcode not found in this upload")
+
+    assign_result = await db.execute(
+        select(Assignment).where(Assignment.upload_id == upload_id, Assignment.unit_id == unit.unit_id)
+    )
+    a = assign_result.scalar_one_or_none()
+
+    skip_result = await db.execute(
+        select(Skip).where(Skip.upload_id == upload_id, Skip.unit_id == unit.unit_id)
+    )
+    is_skipped = skip_result.scalar_one_or_none() is not None
+
+    return UnitResponse(
+        upload_id=unit.upload_id,
+        unit_id=unit.unit_id,
+        site_id=unit.site_id,
+        unit_name=unit.unit_name,
+        sequence=unit.sequence,
+        customer_name=unit.customer_name,
+        customer_id=unit.customer_id,
+        barcode=unit.barcode,
+        assignment_status=a.status.value if a else None,
+        dev_eui_normalized=a.dev_eui_normalized if a else None,
+        is_skipped=is_skipped,
     )

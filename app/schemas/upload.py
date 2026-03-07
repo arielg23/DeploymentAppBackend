@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -13,6 +12,7 @@ class UnitResponse(BaseModel):
     sequence: int
     customer_name: Optional[str] = None
     customer_id: Optional[str] = None
+    barcode: Optional[str] = None
     assignment_status: Optional[str] = None
     dev_eui_normalized: Optional[str] = None
     is_skipped: bool = False

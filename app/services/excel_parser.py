@@ -36,6 +36,7 @@ async def parse_and_create_upload(
     units_data = []
     errors = []
     seen_unit_ids = set()
+    seen_barcodes = set()
 
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         row_site_id = str(row[col["site_id"]]).strip() if row[col["site_id"]] else ""
@@ -59,11 +60,19 @@ async def parse_and_create_upload(
             errors.append(f"Row {row_idx}: invalid sequence value")
             continue
 
+        barcode = str(row[col["barcode"]]).strip() if "barcode" in col and row[col["barcode"]] else None
+        if barcode and barcode in seen_barcodes:
+            errors.append(f"Row {row_idx}: duplicate barcode {barcode}")
+            continue
+        if barcode:
+            seen_barcodes.add(barcode)
+
         seen_unit_ids.add(row_unit_id)
         units_data.append({
             "unit_id": row_unit_id,
             "unit_name": unit_name,
             "sequence": sequence,
+            "barcode": barcode,
             "customer_name": str(row[col["customer_name"]]).strip() if "customer_name" in col and row[col["customer_name"]] else None,
             "customer_id": str(row[col["customer_id"]]).strip() if "customer_id" in col and row[col["customer_id"]] else None,
         })
