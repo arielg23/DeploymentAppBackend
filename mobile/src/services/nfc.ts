@@ -1,4 +1,4 @@
-import NfcManager, {NfcEvents, NfcTech, Ndef} from 'react-native-nfc-manager';
+import NfcManager, {NfcTech, Ndef} from 'react-native-nfc-manager';
 
 let initialized = false;
 
@@ -17,23 +17,51 @@ export const initNfc = async (): Promise<boolean> => {
 
 export const isNfcEnabled = (): Promise<boolean> => NfcManager.isEnabled();
 
+function uidToHex(id: any): string {
+  if (!id) return '0000000000000000';
+  try {
+    const bytes: number[] = Array.from(id);
+    const raw = bytes.map(b => (b & 0xFF).toString(16).padStart(2, '0')).join('').toUpperCase();
+    return raw.padEnd(16, '0').substring(0, 16);
+  } catch {
+    return '0000000000000000';
+  }
+}
+
+// Single requestTechnology call with multiple tech types — user taps once,
+// Android picks whichever technology the tag supports (Ndef, NfcA, or NfcB).
 export const readNfcTag = (): Promise<string> =>
   new Promise(async (resolve, reject) => {
     try {
-      await NfcManager.requestTechnology(NfcTech.Ndef);
+      // Pass an array: Android uses the first matching technology
+      await NfcManager.requestTechnology([NfcTech.Ndef, NfcTech.NfcA, NfcTech.NfcB] as any);
       const tag = await NfcManager.getTag();
-      if (!tag?.ndefMessage?.length) {
-        await NfcManager.cancelTechnologyRequest();
-        reject(new Error('No NDEF message on tag'));
+      await NfcManager.cancelTechnologyRequest();
+
+      // Prefer NDEF text payload (actual lock DevEUI)
+      if (tag?.ndefMessage?.length) {
+        try {
+          const record = tag.ndefMessage[0];
+          const payload = Ndef.text.decodePayload(new Uint8Array(record.payload as any));
+          if (payload && payload.trim().length > 0) {
+            resolve(payload.trim());
+            return;
+          }
+        } catch {
+          // Not a text record — fall through to UID
+        }
+      }
+
+      // Fall back to tag UID (works for credit cards, bus cards, plain NFC chips)
+      if (tag?.id) {
+        resolve(uidToHex(tag.id));
         return;
       }
-      const record = tag.ndefMessage[0];
-      const payload = Ndef.text.decodePayload(new Uint8Array(record.payload));
-      await NfcManager.cancelTechnologyRequest();
-      resolve(payload.trim());
-    } catch (e) {
+
+      reject(new Error('Could not read any identifier from this tag'));
+    } catch (e: any) {
       await NfcManager.cancelTechnologyRequest().catch(() => {});
-      reject(e);
+      reject(new Error(e?.message || 'Failed to read NFC tag'));
     }
   });
 

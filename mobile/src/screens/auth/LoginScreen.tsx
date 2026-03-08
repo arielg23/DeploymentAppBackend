@@ -2,8 +2,10 @@ import React, {useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +13,8 @@ import {
   View,
 } from 'react-native';
 import {useAuthStore} from '../../store/authStore';
+
+const BG = '#0D7A8C';
 
 export const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -30,15 +34,33 @@ export const LoginScreen = () => {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.card}>
-        <Text style={styles.logo}>🔒</Text>
-        <Text style={styles.title}>Smart Lock Deployment</Text>
-        <Text style={styles.subtitle}>Technician Login</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.topBar}>
+          <Text style={styles.hamburger}>{'\u2261'}</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View style={styles.topBarSpacer} />
+        </View>
 
+        <Text style={styles.title}>Lock Deployment</Text>
+        <Text style={styles.welcome}>Welcome!</Text>
+        <Text style={styles.subtitle}>
+          This deployment application will help you ensure correct lock-to-unit association.
+        </Text>
+
+        <Text style={styles.loginLabel}>LOGIN</Text>
+
+        <Text style={styles.fieldLabel}>E-MAIL</Text>
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder=""
+          placeholderTextColor="#ccc"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -46,31 +68,59 @@ export const LoginScreen = () => {
           autoCorrect={false}
           editable={!isLoading}
         />
+
+        <Text style={styles.fieldLabel}>Password</Text>
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder=""
+          placeholderTextColor="#ccc"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           editable={!isLoading}
         />
 
-        <TouchableOpacity style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
-          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Login</Text>}
-        </TouchableOpacity>
-      </View>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.button, isLoading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}>
+            {isLoading ? (
+              <ActivityIndicator color={BG} />
+            ) : (
+              <Text style={styles.buttonText}>Continue</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#F2F2F7', justifyContent: 'center', padding: 24},
-  card: {backgroundColor: '#fff', borderRadius: 16, padding: 28, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 4},
-  logo: {fontSize: 40, textAlign: 'center', marginBottom: 8},
-  title: {fontSize: 22, fontWeight: '700', textAlign: 'center', color: '#1C1C1E'},
-  subtitle: {fontSize: 14, color: '#8E8E93', textAlign: 'center', marginBottom: 24},
-  input: {borderWidth: 1, borderColor: '#E5E5EA', borderRadius: 10, padding: 14, marginBottom: 12, fontSize: 16, backgroundColor: '#F9F9F9'},
-  button: {backgroundColor: '#007AFF', borderRadius: 10, padding: 16, alignItems: 'center', marginTop: 8},
-  buttonDisabled: {backgroundColor: '#99C0FF'},
-  buttonText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  container: {flex: 1, backgroundColor: BG},
+  scroll: {flexGrow: 1, paddingBottom: 48},
+  topBar: {flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 52, paddingBottom: 16},
+  hamburger: {fontSize: 26, color: '#fff', width: 36},
+  logo: {flex: 1, height: 72},
+  topBarSpacer: {width: 36},
+  title: {fontSize: 24, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 24, paddingHorizontal: 24},
+  welcome: {fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 8, paddingHorizontal: 24},
+  subtitle: {fontSize: 14, color: 'rgba(255,255,255,0.88)', lineHeight: 21, marginBottom: 32, paddingHorizontal: 24},
+  loginLabel: {fontSize: 12, fontWeight: '700', color: '#fff', letterSpacing: 2, textAlign: 'center', marginBottom: 20},
+  fieldLabel: {fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 6, paddingHorizontal: 24},
+  input: {
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    marginHorizontal: 24,
+    marginBottom: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 15,
+    color: '#1C1C1E',
+  },
+  buttonRow: {alignItems: 'center', marginTop: 16},
+  button: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 56},
+  buttonDisabled: {opacity: 0.6},
+  buttonText: {color: BG, fontSize: 16, fontWeight: '700'},
 });

@@ -1,88 +1,166 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {Animated, Easing, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {cancelNfcRead, initNfc, readNfcTag} from '../../services/nfc';
-import {validateDevEui} from '../../services/deveui';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {useSessionStore} from '../../store/sessionStore';
+import {readNfcTag, cancelNfcRead, initNfc} from '../../services/nfc';
+import {submitAssignment, submitSkip} from '../../api/sites';
 
-export const DeploymentScanNFCScreen = ({navigation, route}: any) => {
-  const {unitId, siteId} = route.params;
-  const [status, setStatus] = useState<'waiting' | 'reading' | 'error'>('waiting');
+const BG = '#0D7A8C';
+type ScreenState = 'scanning' | 'assigning' | 'success' | 'error';
+
+const TopBar = () => (
+  <View style={styles.topBar}>
+    <Text style={styles.hamburger}>{'\u2261'}</Text>
+    <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+    <View style={styles.topBarSpacer} />
+  </View>
+);
+
+export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
+  const {unitId, unitName, siteId} = route.params as {unitId: string; unitName: string; siteId: string};
+  const {selectedSite, activeUpload} = useSessionStore();
+  const [state, setState] = useState<ScreenState>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
-  const pulse = useRef(new Animated.Value(1)).current;
+  const scanning = useRef(false);
+
+  const startScan = useCallback(async () => {
+    if (scanning.current) return;
+    scanning.current = true;
+    setState('scanning');
+    setErrorMsg('');
+    try {
+      await initNfc();
+      const devEui = await readNfcTag();
+      setState('assigning');
+      if (!activeUpload) throw new Error('No active upload');
+      await submitAssignment(activeUpload.upload_id, {
+        site_id: siteId,
+        unit_id: unitId,
+        dev_eui_raw: devEui,
+        timestamp_local: new Date().toISOString(),
+      });
+      setState('success');
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      const msg = detail
+        ? typeof detail === 'string' ? detail : JSON.stringify(detail)
+        : e?.message || 'An unexpected error occurred.';
+      setErrorMsg(msg);
+      setState('error');
+    } finally {
+      scanning.current = false;
+    }
+  }, [activeUpload, siteId, unitId]);
 
   useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {toValue: 1.15, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true}),
-        Animated.timing(pulse, {toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true}),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [pulse]);
+    startScan();
+    return () => { cancelNfcRead(); };
+  }, [startScan]);
 
-  const startRead = async () => {
-    setStatus('reading');
-    setErrorMsg('');
-    const ready = await initNfc();
-    if (!ready) {
-      setStatus('error');
-      setErrorMsg('NFC is not available or disabled on this device');
-      return;
-    }
-    try {
-      const raw = await readNfcTag();
-      const {valid, normalized, error} = validateDevEui(raw);
-      if (!valid) {
-        setStatus('error');
-        setErrorMsg(error || 'Invalid DevEUI');
-        return;
-      }
-      navigation.navigate('DeploymentConfirm', {unitId, siteId, devEuiRaw: raw, devEuiNormalized: normalized});
-      setStatus('waiting');
-    } catch (e: any) {
-      setStatus('error');
-      setErrorMsg(e.message || 'Failed to read NFC tag');
-    }
-  };
+  const handleSkip = useCallback(() => {
+    Alert.alert('Skip Unit', 'Are you sure you want to skip this unit?', [
+      {text: 'Cancel', style: 'cancel'},
+      {
+        text: 'Skip', style: 'destructive', onPress: async () => {
+          try {
+            if (activeUpload) {
+              await submitSkip(activeUpload.upload_id, {site_id: siteId, unit_id: unitId});
+            }
+          } catch {}
+          navigation.navigate('DeploymentScanQR');
+        },
+      },
+    ]);
+  }, [activeUpload, siteId, unitId, navigation]);
+
+  const siteName = selectedSite ? selectedSite.site_name : '';
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Scan Lock</Text>
-      <Text style={styles.unitLabel}>Unit: {unitId}</Text>
+      <TopBar />
+      <Text style={styles.title}>Lock Deployment</Text>
+      <Text style={styles.siteName}>{siteName}</Text>
+      <Text style={styles.sectionLabel}>Read lock NFC ID</Text>
 
-      <Animated.View style={[styles.nfcCircle, {transform: [{scale: pulse}]}]}>
-        <Text style={styles.nfcIcon}>📡</Text>
-      </Animated.View>
+      {(state === 'scanning' || state === 'assigning') && (
+        <>
+          <Text style={styles.bodyText}>
+            {state === 'assigning' ? 'Assigning lock...' : 'Place your phone on the lock on'}
+          </Text>
+          <View style={styles.unitBox}>
+            {state === 'assigning'
+              ? <ActivityIndicator color={BG} size="large" />
+              : <Text style={styles.unitBoxText}>{unitName}</Text>
+            }
+          </View>
+        </>
+      )}
 
-      <Text style={styles.instruction}>
-        {status === 'waiting' ? 'Tap the button and hold your phone to the lock' :
-         status === 'reading' ? 'Reading lock NFC...' : 'Error reading lock'}
-      </Text>
+      {state === 'success' && (
+        <>
+          <Text style={styles.bodyText}>NFC ID Detected</Text>
+          <Text style={styles.bodyText}>Lock has been associated with</Text>
+          <View style={styles.unitBox}>
+            <Text style={styles.unitBoxText}>{unitName}</Text>
+          </View>
+          <View style={styles.bottomRow}>
+            <TouchableOpacity style={styles.whiteBtn} onPress={() => navigation.navigate('DeploymentScanQR')}>
+              <Text style={styles.whiteBtnText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
 
-      {status === 'error' && <Text style={styles.error}>{errorMsg}</Text>}
-
-      <TouchableOpacity style={[styles.button, status === 'reading' && styles.buttonDisabled]} onPress={startRead} disabled={status === 'reading'}>
-        <Text style={styles.buttonText}>{status === 'reading' ? 'Reading...' : 'Read NFC'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.cancelBtn} onPress={() => { cancelNfcRead(); navigation.goBack(); }}>
-        <Text style={styles.cancelText}>Cancel</Text>
-      </TouchableOpacity>
+      {state === 'error' && (
+        <>
+          <Text style={styles.bodyText}>NFC ID Detected</Text>
+          <Text style={styles.errorLabel}>ERROR</Text>
+          <Text style={styles.errorText}>
+            {'Lock cannot be associated.\n' + (errorMsg || 'An error has been reported.')}
+          </Text>
+          <View style={styles.errorButtons}>
+            <TouchableOpacity style={styles.whiteBtn} onPress={handleSkip}>
+              <Text style={styles.whiteBtnText}>Skip Unit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.whiteBtn} onPress={() => { scanning.current = false; startScan(); }}>
+              <Text style={[styles.whiteBtnText, {textAlign: 'center'}]}>{'Different\nLock'}</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#F2F2F7', alignItems: 'center', justifyContent: 'center', padding: 24},
-  title: {fontSize: 24, fontWeight: '700', color: '#1C1C1E', marginBottom: 4},
-  unitLabel: {fontSize: 15, color: '#8E8E93', marginBottom: 40},
-  nfcCircle: {width: 160, height: 160, borderRadius: 80, backgroundColor: '#007AFF22', alignItems: 'center', justifyContent: 'center', marginBottom: 32},
-  nfcIcon: {fontSize: 64},
-  instruction: {fontSize: 16, color: '#3C3C43', textAlign: 'center', marginBottom: 8},
-  error: {fontSize: 14, color: '#FF3B30', textAlign: 'center', marginVertical: 8, paddingHorizontal: 16},
-  button: {backgroundColor: '#007AFF', borderRadius: 12, paddingHorizontal: 40, paddingVertical: 16, marginTop: 24},
-  buttonDisabled: {backgroundColor: '#99C0FF'},
-  buttonText: {color: '#fff', fontSize: 17, fontWeight: '600'},
-  cancelBtn: {marginTop: 16, padding: 12},
-  cancelText: {color: '#FF3B30', fontSize: 16},
+  container: {flex: 1, backgroundColor: BG},
+  topBar: {flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 52, paddingBottom: 8},
+  hamburger: {fontSize: 26, color: '#fff', width: 36},
+  logo: {flex: 1, height: 72},
+  topBarSpacer: {width: 36},
+  title: {fontSize: 20, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 2},
+  siteName: {fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 24},
+  sectionLabel: {fontSize: 20, fontWeight: '700', color: '#fff', paddingHorizontal: 24, marginBottom: 12},
+  bodyText: {fontSize: 15, color: '#fff', paddingHorizontal: 24, marginBottom: 4, lineHeight: 22},
+  unitBox: {
+    marginHorizontal: 24, marginTop: 16,
+    borderWidth: 2, borderColor: '#fff', borderRadius: 4,
+    paddingVertical: 24, paddingHorizontal: 16,
+    alignItems: 'center', justifyContent: 'center',
+    minHeight: 80,
+  },
+  unitBoxText: {fontSize: 26, fontWeight: '800', color: '#fff', textAlign: 'center'},
+  errorLabel: {fontSize: 16, fontWeight: '800', color: '#FF4444', paddingHorizontal: 24, marginTop: 12, marginBottom: 4},
+  errorText: {fontSize: 15, color: '#fff', paddingHorizontal: 24, lineHeight: 22},
+  bottomRow: {position: 'absolute', bottom: 48, alignSelf: 'center'},
+  errorButtons: {position: 'absolute', bottom: 48, left: 24, right: 24, flexDirection: 'row', gap: 16},
+  whiteBtn: {flex: 1, backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, alignItems: 'center'},
+  whiteBtnText: {color: BG, fontSize: 15, fontWeight: '700'},
 });

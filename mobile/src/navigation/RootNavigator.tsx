@@ -10,7 +10,8 @@ import {SiteSelectionScreen} from '../screens/home/SiteSelectionScreen';
 import {ModeSelectionScreen} from '../screens/home/ModeSelectionScreen';
 import {DeploymentScanQRScreen} from '../screens/deployment/DeploymentScanQRScreen';
 import {DeploymentScanNFCScreen} from '../screens/deployment/DeploymentScanNFCScreen';
-import {DeploymentConfirmScreen} from '../screens/deployment/DeploymentConfirmScreen';
+import {DeploymentCompleteScreen} from '../screens/deployment/DeploymentCompleteScreen';
+import {AllSitesCompleteScreen} from '../screens/deployment/AllSitesCompleteScreen';
 import {GuidedUnitListScreen} from '../screens/guided/GuidedUnitListScreen';
 import {GuidedScanNFCScreen} from '../screens/guided/GuidedScanNFCScreen';
 import {GuidedSkipScreen} from '../screens/guided/GuidedSkipScreen';
@@ -30,27 +31,32 @@ export const RootNavigator = () => {
   }, [restoreSession]);
 
   if (loading) {
-    return <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}><ActivityIndicator size="large" color="#007AFF" /></View>;
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D7A8C'}}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
   }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{headerShown: true}}>
+      <Stack.Navigator screenOptions={{headerShown: false}}>
         {!isAuthenticated ? (
-          <Stack.Screen name="Login" component={LoginScreen} options={{headerShown: false}} />
+          <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
           <>
-            <Stack.Screen name="SiteSelection" component={SiteSelectionScreen} options={{title: 'Select Site', headerBackVisible: false}} />
-            <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} options={{title: 'Mode'}} />
-            <Stack.Screen name="DeploymentScanQR" component={DeploymentScanQRScreen} options={{title: 'Scan QR Sticker', headerShown: false}} />
-            <Stack.Screen name="DeploymentScanNFC" component={DeploymentScanNFCScreen} options={{title: 'Scan Lock'}} />
-            <Stack.Screen name="DeploymentConfirm" component={DeploymentConfirmScreen} options={{title: 'Confirm'}} />
-            <Stack.Screen name="GuidedUnitList" component={GuidedUnitListScreen} options={{title: 'Units'}} />
-            <Stack.Screen name="GuidedScanNFC" component={GuidedScanNFCScreen} options={{title: 'Scan Lock'}} />
-            <Stack.Screen name="GuidedSkip" component={GuidedSkipScreen} options={{title: 'Skip Unit'}} />
-            <Stack.Screen name="AdHocScan" component={AdHocScanScreen} options={{title: 'Ad-Hoc Scan'}} />
-            <Stack.Screen name="AdHocConfirm" component={AdHocConfirmScreen} options={{title: 'Result'}} />
-            <Stack.Screen name="ConflictList" component={ConflictListScreen} options={{title: 'Needs Action'}} />
+            <Stack.Screen name="SiteSelection" component={SiteSelectionScreen} />
+            <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} />
+            <Stack.Screen name="DeploymentScanQR" component={DeploymentScanQRScreen} />
+            <Stack.Screen name="DeploymentScanNFC" component={DeploymentScanNFCScreen} />
+            <Stack.Screen name="DeploymentComplete" component={DeploymentCompleteScreen} />
+            <Stack.Screen name="AllSitesComplete" component={AllSitesCompleteScreen} />
+            <Stack.Screen name="GuidedUnitList" component={GuidedUnitListScreen} />
+            <Stack.Screen name="GuidedScanNFC" component={GuidedScanNFCScreen} />
+            <Stack.Screen name="GuidedSkip" component={GuidedSkipScreen} />
+            <Stack.Screen name="AdHocScan" component={AdHocScanScreen} />
+            <Stack.Screen name="AdHocConfirm" component={AdHocConfirmScreen} />
+            <Stack.Screen name="ConflictList" component={ConflictListScreen} />
           </>
         )}
       </Stack.Navigator>

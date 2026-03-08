@@ -29,3 +29,6 @@ export const submitValidation = (payload: {
   site_id: string;
   dev_eui_normalized: string;
 }) => apiClient.post('/validation', payload).then(r => r.data);
+
+export const lookupByBarcode = (uploadId: string, barcode: string) =>
+  apiClient.get<Unit>(`/upload/${uploadId}/barcode/${encodeURIComponent(barcode)}`).then(r => r.data);
