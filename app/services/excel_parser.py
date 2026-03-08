@@ -24,7 +24,7 @@ async def parse_and_create_upload(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot read Excel file: {e}")
 
-    headers = [str(cell.value).strip().lower() if cell.value else "" for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+    headers = [str(cell.value).strip().lower().replace(" ", "_") if cell.value else "" for cell in next(ws.iter_rows(min_row=1, max_row=1))]
     missing = REQUIRED_COLUMNS - set(headers)
     if missing:
         raise HTTPException(
