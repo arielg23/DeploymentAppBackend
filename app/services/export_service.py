@@ -29,10 +29,10 @@ async def generate_csv(db: AsyncSession, upload_id: uuid.UUID) -> str:
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "site_id", "unit_id", "unit_name", "sequence",
-        "dev_eui_raw", "dev_eui_normalized",
-        "technician_email", "timestamp_local", "timestamp_server",
-        "status",
+        'site_id', 'unit_id', 'unit_name', 'sequence',
+        'dev_eui_raw', 'dev_eui_normalized',
+        'technician_email', 'timestamp_local', 'timestamp_server',
+        'status',
     ])
 
     for a in assignments:
@@ -40,10 +40,10 @@ async def generate_csv(db: AsyncSession, upload_id: uuid.UUID) -> str:
         writer.writerow([
             a.site_id,
             a.unit_id,
-            unit.unit_name if unit else "",
-            unit.sequence if unit else "",
-            a.dev_eui_raw,
-            a.dev_eui_normalized,
+            unit.unit_name if unit else '',
+            unit.sequence if unit else '',
+            f'="{a.dev_eui_raw}"',
+            f'="{a.dev_eui_normalized}"',
             a.technician.email,
             a.timestamp_local.isoformat(),
             a.timestamp_server.isoformat(),
