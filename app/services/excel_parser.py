@@ -8,7 +8,7 @@ from models.site import Site
 from models.unit import Unit
 from models.upload import Upload, UploadStatus
 
-REQUIRED_COLUMNS = {"site_id", "unit_id", "unit_name", "sequence"}
+REQUIRED_COLUMNS = {"unit_id", "unit_name", "sequence"}
 
 
 async def parse_and_create_upload(
@@ -39,7 +39,6 @@ async def parse_and_create_upload(
     seen_barcodes = set()
 
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        row_site_id = str(row[col["site_id"]]).strip() if row[col["site_id"]] else ""
         row_unit_id = str(row[col["unit_id"]]).strip() if row[col["unit_id"]] else ""
         unit_name = str(row[col["unit_name"]]).strip() if row[col["unit_name"]] else ""
         sequence = row[col["sequence"]]
@@ -47,9 +46,14 @@ async def parse_and_create_upload(
         if not row_unit_id or not unit_name:
             errors.append(f"Row {row_idx}: missing unit_id or unit_name")
             continue
-        if row_site_id and row_site_id != site_id:
-            errors.append(f"Row {row_idx}: site_id mismatch (expected {site_id}, got {row_site_id})")
-            continue
+
+        # Optional: validate site_id column if present
+        if "site_id" in col and row[col["site_id"]]:
+            row_site_id = str(row[col["site_id"]]).strip()
+            if row_site_id and row_site_id != site_id:
+                errors.append(f"Row {row_idx}: site_id mismatch (expected {site_id}, got {row_site_id})")
+                continue
+
         if row_unit_id in seen_unit_ids:
             errors.append(f"Row {row_idx}: duplicate unit_id {row_unit_id}")
             continue

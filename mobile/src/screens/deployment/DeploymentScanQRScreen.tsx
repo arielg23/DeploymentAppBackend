@@ -32,6 +32,7 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [alreadyDeployed, setAlreadyDeployed] = useState<string | null>(null);
   const device = useCameraDevice('back');
   const {hasPermission, requestPermission} = useCameraPermission();
 
@@ -44,6 +45,7 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
     setLoadingUnits(true);
     setScanned(false);
     setConfirm(null);
+    setAlreadyDeployed(null);
     getUnits(activeUpload.upload_id)
       .then(data => {
         setUnits(data);
@@ -62,6 +64,14 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
     try {
       const unit = await lookupByBarcode(activeUpload.upload_id, value);
       setLoading(false);
+
+      // Already deployed check
+      if (unit.assignment_status) {
+        setAlreadyDeployed(unit.unit_name);
+        setScanned(false);
+        return;
+      }
+
       if (nextUnit && unit.unit_id !== nextUnit.unit_id) {
         setConfirm({scannedUnit: unit, expectedUnit: nextUnit});
       } else {
@@ -86,7 +96,30 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
     onCodeScanned,
   });
 
-  // Wrong-unit confirmation screen
+  // Already-deployed inline message
+  if (alreadyDeployed) {
+    return (
+      <View style={styles.container}>
+        <TopBar />
+        <Text style={styles.title}>Lock Deployment</Text>
+        <Text style={styles.siteName}>{selectedSite ? selectedSite.site_name : ''}</Text>
+        <View style={styles.messageBody}>
+          <Text style={styles.warnLabel}>ALREADY DEPLOYED</Text>
+          <Text style={styles.messageText}>
+            {'This unit has already been deployed. Scan another unit label.'}
+          </Text>
+          <Text style={styles.messageUnit}>{alreadyDeployed}</Text>
+        </View>
+        <View style={styles.centreBottom}>
+          <TouchableOpacity style={styles.whiteBtn} onPress={() => { setAlreadyDeployed(null); setScanned(false); }}>
+            <Text style={styles.whiteBtnText}>Scan Another</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Wrong-unit confirmation
   if (confirm) {
     return (
       <View style={styles.container}>
@@ -191,6 +224,13 @@ const styles = StyleSheet.create({
   frameHint: {color: 'rgba(255,255,255,0.85)', fontSize: 14, marginTop: 14, textAlign: 'center'},
   loadingOverlay: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(13,122,140,0.85)', alignItems: 'center', justifyContent: 'center'},
   loadingText: {color: '#fff', marginTop: 12, fontSize: 16},
+  // Already deployed
+  messageBody: {paddingHorizontal: 24, marginTop: 24, flex: 1},
+  warnLabel: {fontSize: 14, fontWeight: '800', color: '#FFD700', letterSpacing: 1, marginBottom: 12},
+  messageText: {fontSize: 16, color: '#fff', lineHeight: 24, marginBottom: 16},
+  messageUnit: {fontSize: 20, fontWeight: '700', color: '#fff'},
+  centreBottom: {position: 'absolute', bottom: 48, left: 0, right: 0, alignItems: 'center'},
+  // Confirmation
   confirmBody: {paddingHorizontal: 24, marginTop: 16, flex: 1},
   confirmText: {fontSize: 16, color: '#fff', lineHeight: 24, marginBottom: 20},
   confirmQuestion: {fontSize: 16, color: '#fff', lineHeight: 24},
@@ -199,6 +239,6 @@ const styles = StyleSheet.create({
   confirmBtnText: {color: BG, fontSize: 16, fontWeight: '700'},
   centreWrap: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32},
   bodyText: {color: 'rgba(255,255,255,0.85)', fontSize: 15, textAlign: 'center', marginBottom: 24, paddingHorizontal: 24},
-  whiteBtn: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 40},
+  whiteBtn: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 56},
   whiteBtnText: {color: BG, fontSize: 16, fontWeight: '700'},
 });

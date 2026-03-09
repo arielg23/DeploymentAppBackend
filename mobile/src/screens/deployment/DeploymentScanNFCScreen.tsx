@@ -110,9 +110,11 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
           <View style={styles.unitBox}>
             <Text style={styles.unitBoxText}>{unitName}</Text>
           </View>
-          <View style={styles.bottomRow}>
-            <TouchableOpacity style={styles.whiteBtn} onPress={() => navigation.navigate('DeploymentScanQR')}>
-              <Text style={styles.whiteBtnText}>Continue</Text>
+          <View style={styles.centreBottom}>
+            <TouchableOpacity
+              style={styles.continueBtn}
+              onPress={() => navigation.navigate('DeploymentScanQR')}>
+              <Text style={styles.continueBtnText}>Continue</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -126,11 +128,11 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
             {'Lock cannot be associated.\n' + (errorMsg || 'An error has been reported.')}
           </Text>
           <View style={styles.errorButtons}>
-            <TouchableOpacity style={styles.whiteBtn} onPress={handleSkip}>
-              <Text style={styles.whiteBtnText}>Skip Unit</Text>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleSkip}>
+              <Text style={styles.actionBtnText}>Skip Unit</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.whiteBtn} onPress={() => { scanning.current = false; startScan(); }}>
-              <Text style={[styles.whiteBtnText, {textAlign: 'center'}]}>{'Different\nLock'}</Text>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => { scanning.current = false; startScan(); }}>
+              <Text style={[styles.actionBtnText, {textAlign: 'center'}]}>{'Different\nLock'}</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -159,8 +161,10 @@ const styles = StyleSheet.create({
   unitBoxText: {fontSize: 26, fontWeight: '800', color: '#fff', textAlign: 'center'},
   errorLabel: {fontSize: 16, fontWeight: '800', color: '#FF4444', paddingHorizontal: 24, marginTop: 12, marginBottom: 4},
   errorText: {fontSize: 15, color: '#fff', paddingHorizontal: 24, lineHeight: 22},
-  bottomRow: {position: 'absolute', bottom: 48, alignSelf: 'center'},
+  centreBottom: {position: 'absolute', bottom: 48, left: 0, right: 0, alignItems: 'center'},
+  continueBtn: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 56},
+  continueBtnText: {color: BG, fontSize: 16, fontWeight: '700'},
   errorButtons: {position: 'absolute', bottom: 48, left: 24, right: 24, flexDirection: 'row', gap: 16},
-  whiteBtn: {flex: 1, backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, alignItems: 'center'},
-  whiteBtnText: {color: BG, fontSize: 15, fontWeight: '700'},
+  actionBtn: {flex: 1, backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, alignItems: 'center'},
+  actionBtnText: {color: BG, fontSize: 15, fontWeight: '700'},
 });
