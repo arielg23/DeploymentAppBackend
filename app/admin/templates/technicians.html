@@ -3,6 +3,9 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0">Technicians</h4>
 </div>
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
 <div class="row g-4">
     <div class="col-md-4">
         <div class="card">

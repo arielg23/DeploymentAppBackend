@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -183,13 +184,24 @@ async def update_site_access(site_id: str, request: Request, admin: Technician =
 async def technicians_page(request: Request, admin: Technician = Depends(get_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Technician).order_by(Technician.email))
     technicians = result.scalars().all()
-    return templates.TemplateResponse('technicians.html', {'request': request, 'admin': admin, 'technicians': technicians})
+    return templates.TemplateResponse('technicians.html', {'request': request, 'admin': admin, 'technicians': technicians, 'error': None})
 
 
 @router.post('/technicians/new')
-async def new_technician(email: str = Form(...), password: str = Form(...), admin: Technician = Depends(get_admin), db: AsyncSession = Depends(get_db)):
+async def new_technician(request: Request, email: str = Form(...), password: str = Form(...), admin: Technician = Depends(get_admin), db: AsyncSession = Depends(get_db)):
     db.add(Technician(email=email, password_hash=hash_password(password)))
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(select(Technician).order_by(Technician.email))
+        technicians = result.scalars().all()
+        existing = next((t for t in technicians if t.email == email), None)
+        if existing and not existing.active:
+            error = f'{email} belongs to a deactivated technician. Use "Activate" on that row instead of creating a new one.'
+        else:
+            error = f'A technician with email {email} already exists.'
+        return templates.TemplateResponse('technicians.html', {'request': request, 'admin': admin, 'technicians': technicians, 'error': error})
     return RedirectResponse('/admin/technicians', status_code=302)
 
 
