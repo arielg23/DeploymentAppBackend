@@ -28,6 +28,7 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
   const {selectedSite, activeUpload} = useSessionStore();
   const [state, setState] = useState<ScreenState>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
+  const [conflictUnit, setConflictUnit] = useState<string | null>(null);
   const scanning = useRef(false);
 
   const startScan = useCallback(async () => {
@@ -35,6 +36,7 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
     scanning.current = true;
     setState('scanning');
     setErrorMsg('');
+    setConflictUnit(null);
     try {
       await initNfc();
       const devEui = await readNfcTag();
@@ -48,11 +50,15 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
       });
       setState('success');
     } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      const msg = detail
-        ? typeof detail === 'string' ? detail : JSON.stringify(detail)
-        : e?.message || 'An unexpected error occurred.';
-      setErrorMsg(msg);
+      if (e?.response?.status === 409 && e?.response?.data?.conflict_type === 'dev_eui') {
+        setConflictUnit(e.response.data.existing?.unit_id || 'another unit');
+      } else {
+        const detail = e?.response?.data?.detail;
+        const msg = detail
+          ? typeof detail === 'string' ? detail : JSON.stringify(detail)
+          : e?.message || 'An unexpected error occurred.';
+        setErrorMsg(msg);
+      }
       setState('error');
     } finally {
       scanning.current = false;
@@ -92,7 +98,7 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
       {(state === 'scanning' || state === 'assigning') && (
         <>
           <Text style={styles.bodyText}>
-            {state === 'assigning' ? 'Assigning lock...' : 'Place your phone on the lock on'}
+            {state === 'assigning' ? 'Assigning lock...' : 'Place your phone on the lock'}
           </Text>
           <View style={styles.unitBox}>
             {state === 'assigning'
@@ -100,16 +106,16 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
               : <Text style={styles.unitBoxText}>{unitName}</Text>
             }
           </View>
+          {state === 'scanning' && (
+            <Text style={styles.hintText}>Hold still — the lock will be read automatically</Text>
+          )}
         </>
       )}
 
       {state === 'success' && (
         <>
           <Text style={styles.bodyText}>NFC ID Detected</Text>
-          <Text style={styles.bodyText}>Lock has been associated with</Text>
-          <View style={styles.unitBox}>
-            <Text style={styles.unitBoxText}>{unitName}</Text>
-          </View>
+          <Text style={styles.bodyText}>{'Lock is associated with ' + unitName}</Text>
           <View style={styles.centreBottom}>
             <TouchableOpacity
               style={styles.continueBtn}
@@ -123,10 +129,13 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
       {state === 'error' && (
         <>
           <Text style={styles.bodyText}>NFC ID Detected</Text>
-          <Text style={styles.errorLabel}>ERROR</Text>
-          <Text style={styles.errorText}>
-            {'Lock cannot be associated.\n' + (errorMsg || 'An error has been reported.')}
-          </Text>
+          {conflictUnit
+            ? <Text style={styles.bodyText}>{'Lock is associated with ' + conflictUnit}</Text>
+            : <>
+                <Text style={styles.errorLabel}>ERROR</Text>
+                <Text style={styles.errorText}>{errorMsg || 'An error has been reported.'}</Text>
+              </>
+          }
           <View style={styles.errorButtons}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleSkip}>
               <Text style={styles.actionBtnText}>Skip Unit</Text>
@@ -151,6 +160,7 @@ const styles = StyleSheet.create({
   siteName: {fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 24},
   sectionLabel: {fontSize: 20, fontWeight: '700', color: '#fff', paddingHorizontal: 24, marginBottom: 12},
   bodyText: {fontSize: 15, color: '#fff', paddingHorizontal: 24, marginBottom: 4, lineHeight: 22},
+  hintText: {fontSize: 14, color: 'rgba(255,255,255,0.7)', paddingHorizontal: 24, marginTop: 12, textAlign: 'center'},
   unitBox: {
     marginHorizontal: 24, marginTop: 16,
     borderWidth: 2, borderColor: '#fff', borderRadius: 4,
