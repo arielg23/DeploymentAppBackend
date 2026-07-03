@@ -11,7 +11,7 @@ import {
 import {useFocusEffect} from '@react-navigation/native';
 import {Camera, useCameraDevice, useCameraPermission, useCodeScanner} from 'react-native-vision-camera';
 import {useSessionStore} from '../../store/sessionStore';
-import {getUnits, lookupByBarcode} from '../../api/sites';
+import {getUnits, lookupByBarcode, submitSkip} from '../../api/sites';
 import type {Unit} from '../../types';
 
 const BG = '#0D7A8C';
@@ -33,6 +33,7 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
   const [scanned, setScanned] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [alreadyDeployed, setAlreadyDeployed] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState<string | null>(null);
   const device = useCameraDevice('back');
   const {hasPermission, requestPermission} = useCameraPermission();
 
@@ -46,6 +47,7 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
     setScanned(false);
     setConfirm(null);
     setAlreadyDeployed(null);
+    setNotFound(null);
     getUnits(activeUpload.upload_id)
       .then(data => {
         setUnits(data);
@@ -82,14 +84,31 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
       }
     } catch (e: any) {
       setLoading(false);
-      setScanned(false);
       if (e?.response?.status === 404) {
-        Alert.alert('Not Found', 'This barcode is not in the unit list for this site.');
+        setNotFound(value);
       } else {
+        setScanned(false);
         Alert.alert('Error', 'Failed to look up barcode. Check your connection.');
       }
     }
   }, [scanned, loading, loadingUnits, activeUpload, nextUnit, navigation]);
+
+  const handleSkipNext = useCallback(() => {
+    if (!activeUpload || !nextUnit) return;
+    Alert.alert('Skip Unit', `Are you sure you want to skip ${nextUnit.unit_name}?`, [
+      {text: 'Cancel', style: 'cancel'},
+      {
+        text: 'Skip', style: 'destructive', onPress: async () => {
+          try {
+            await submitSkip(activeUpload.upload_id, {site_id: nextUnit.site_id, unit_id: nextUnit.unit_id});
+          } catch {}
+          setNotFound(null);
+          setScanned(false);
+          getUnits(activeUpload.upload_id).then(setUnits).catch(() => {});
+        },
+      },
+    ]);
+  }, [activeUpload, nextUnit]);
 
   const codeScanner = useCodeScanner({
     codeTypes: ['code-128', 'code-39', 'code-93', 'ean-13', 'ean-8', 'qr', 'data-matrix'],
@@ -113,6 +132,31 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
         <View style={styles.centreBottom}>
           <TouchableOpacity style={styles.whiteBtn} onPress={() => { setAlreadyDeployed(null); setScanned(false); }}>
             <Text style={styles.whiteBtnText}>Scan Another</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Barcode not found in this upload
+  if (notFound) {
+    return (
+      <View style={styles.container}>
+        <TopBar />
+        <Text style={styles.title}>Lock Deployment</Text>
+        <Text style={styles.siteName}>{selectedSite ? selectedSite.site_name : ''}</Text>
+        <View style={styles.messageBody}>
+          <Text style={styles.warnLabel}>BARCODE NOT FOUND</Text>
+          <Text style={styles.messageText}>
+            {'The code "' + notFound + '" does not match any unit in this upload. Check the sticker or try rescanning.'}
+          </Text>
+        </View>
+        <View style={styles.confirmButtons}>
+          <TouchableOpacity style={styles.confirmBtn} onPress={handleSkipNext}>
+            <Text style={styles.confirmBtnText}>Skip Unit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.confirmBtn} onPress={() => { setNotFound(null); setScanned(false); }}>
+            <Text style={styles.confirmBtnText}>Rescan</Text>
           </TouchableOpacity>
         </View>
       </View>
