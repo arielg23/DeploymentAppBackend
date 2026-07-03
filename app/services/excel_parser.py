@@ -11,6 +11,15 @@ from models.upload import Upload, UploadStatus
 REQUIRED_COLUMNS = {"unit_id", "unit_name", "sequence"}
 
 
+def _cell_str(value) -> str:
+    """Stringify a cell value, collapsing whole-number floats (e.g. 801234567890.0
+    from an Excel numeric cell) down to their integer form so identifiers like
+    unit_id/barcode don't pick up a spurious '.0' suffix."""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
 async def parse_and_create_upload(
     db: AsyncSession,
     file: BinaryIO,
@@ -39,7 +48,7 @@ async def parse_and_create_upload(
     seen_barcodes = set()
 
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        row_unit_id = str(row[col["unit_id"]]).strip() if row[col["unit_id"]] else ""
+        row_unit_id = _cell_str(row[col["unit_id"]]) if row[col["unit_id"]] else ""
         unit_name = str(row[col["unit_name"]]).strip() if row[col["unit_name"]] else ""
         sequence = row[col["sequence"]]
 
@@ -64,7 +73,7 @@ async def parse_and_create_upload(
             errors.append(f"Row {row_idx}: invalid sequence value")
             continue
 
-        barcode = str(row[col["barcode"]]).strip() if "barcode" in col and row[col["barcode"]] else None
+        barcode = _cell_str(row[col["barcode"]]) if "barcode" in col and row[col["barcode"]] else None
         if barcode and barcode in seen_barcodes:
             errors.append(f"Row {row_idx}: duplicate barcode {barcode}")
             continue
