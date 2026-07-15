@@ -2,6 +2,7 @@ import uuid
 from typing import BinaryIO
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.site import Site
@@ -26,6 +27,11 @@ async def parse_and_create_upload(
     site_id: str,
     uploaded_by: uuid.UUID,
 ) -> dict:
+    site_result = await db.execute(select(Site).where(Site.site_id == site_id))
+    site = site_result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Site {site_id} not found")
+
     try:
         import openpyxl
         wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
@@ -56,11 +62,12 @@ async def parse_and_create_upload(
             errors.append(f"Row {row_idx}: missing unit_id or unit_name")
             continue
 
-        # Optional: validate site_id column if present
-        if "site_id" in col and row[col["site_id"]]:
-            row_site_id = str(row[col["site_id"]]).strip()
-            if row_site_id and row_site_id != site_id:
-                errors.append(f"Row {row_idx}: site_id mismatch (expected {site_id}, got {row_site_id})")
+        # Optional: validate site_name column if present (case/whitespace-insensitive,
+        # since it's hand-typed rather than a machine-generated identifier)
+        if "site_name" in col and row[col["site_name"]]:
+            row_site_name = str(row[col["site_name"]]).strip()
+            if row_site_name and row_site_name.lower() != site.site_name.lower():
+                errors.append(f"Row {row_idx}: site_name mismatch (expected {site.site_name!r}, got {row_site_name!r})")
                 continue
 
         if row_unit_id in seen_unit_ids:
@@ -95,13 +102,6 @@ async def parse_and_create_upload(
 
     if not units_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid units found in file")
-
-    # Ensure site exists
-    from sqlalchemy import select
-    site_result = await db.execute(select(Site).where(Site.site_id == site_id))
-    site = site_result.scalar_one_or_none()
-    if not site:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Site {site_id} not found")
 
     upload = Upload(site_id=site_id, status=UploadStatus.INACTIVE, uploaded_by=uploaded_by)
     db.add(upload)

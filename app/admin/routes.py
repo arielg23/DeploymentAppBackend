@@ -1,3 +1,4 @@
+import io
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, File, status
@@ -7,6 +8,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from core.config import settings
 from core.database import get_db
@@ -20,6 +22,7 @@ from models.unit import Unit
 from models.upload import Upload, UploadStatus
 from services.excel_parser import parse_and_create_upload
 from services.export_service import generate_csv
+from services.template_service import generate_unit_template
 from services.upload_service import activate_upload, complete_upload
 
 router = APIRouter(prefix='/admin')
@@ -94,9 +97,21 @@ async def dashboard(request: Request, admin: Technician = Depends(get_admin), db
 
 @router.get('/uploads', response_class=HTMLResponse)
 async def uploads_list(request: Request, admin: Technician = Depends(get_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Upload).order_by(Upload.uploaded_at.desc()))
+    result = await db.execute(select(Upload).options(selectinload(Upload.site)).order_by(Upload.uploaded_at.desc()))
     uploads = result.scalars().all()
     return templates.TemplateResponse('uploads.html', {'request': request, 'admin': admin, 'uploads': uploads})
+
+
+@router.get('/templates/download')
+async def download_template(admin: Technician = Depends(get_admin), db: AsyncSession = Depends(get_db)):
+    sites_result = await db.execute(select(Site).order_by(Site.site_name))
+    sites = sites_result.scalars().all()
+    content = generate_unit_template(sites)
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=unit_upload_template.xlsx'},
+    )
 
 
 @router.get('/uploads/new', response_class=HTMLResponse)
@@ -119,7 +134,7 @@ async def upload_new_submit(request: Request, site_id: str = Form(...), file: Up
 
 @router.get('/uploads/{upload_id}', response_class=HTMLResponse)
 async def upload_detail(upload_id: uuid.UUID, request: Request, admin: Technician = Depends(get_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Upload).where(Upload.upload_id == upload_id))
+    result = await db.execute(select(Upload).options(selectinload(Upload.site)).where(Upload.upload_id == upload_id))
     upload = result.scalar_one_or_none()
     if not upload:
         raise HTTPException(status_code=404, detail='Upload not found')

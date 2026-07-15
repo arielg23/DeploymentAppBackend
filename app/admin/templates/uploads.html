@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <h4 class="mb-0">Uploads</h4>
     <a href="/admin/uploads/new" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Upload</a>
+</div>
+<div class="mb-4">
+    <a href="/admin/templates/download" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Download Templates</a>
 </div>
 <div class="card">
 <table class="table table-hover mb-0">
@@ -13,7 +16,7 @@
     {% for u in uploads %}
     <tr>
         <td><code>{{ u.upload_id | string | truncate(16, true, '') }}</code></td>
-        <td>{{ u.site_id }}</td>
+        <td>{{ u.site.site_name }} <small class="text-muted">({{ u.site_id }})</small></td>
         <td><span class="badge bg-{% if u.status.value == 'ACTIVE' %}success{% elif u.status.value == 'COMPLETE' %}secondary{% else %}warning text-dark{% endif %}">{{ u.status.value }}</span></td>
         <td>{{ u.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
         <td><a href="/admin/uploads/{{ u.upload_id }}" class="btn btn-sm btn-outline-primary">View</a></td>

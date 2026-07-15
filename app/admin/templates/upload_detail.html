@@ -15,7 +15,7 @@
     <div class="card-body">
         <dl class="row mb-0">
             <dt class="col-sm-3">Upload ID</dt><dd class="col-sm-9"><code>{{ upload.upload_id }}</code></dd>
-            <dt class="col-sm-3">Site</dt><dd class="col-sm-9">{{ upload.site_id }}</dd>
+            <dt class="col-sm-3">Site</dt><dd class="col-sm-9">{{ upload.site.site_name }} <small class="text-muted">({{ upload.site_id }})</small></dd>
             <dt class="col-sm-3">Uploaded At</dt><dd class="col-sm-9">{{ upload.uploaded_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
         </dl>
     </div>

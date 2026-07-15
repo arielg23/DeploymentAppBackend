@@ -1,10 +1,11 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -34,8 +35,11 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [alreadyDeployed, setAlreadyDeployed] = useState<string | null>(null);
   const [notFound, setNotFound] = useState<string | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualValue, setManualValue] = useState('');
   const device = useCameraDevice('back');
   const {hasPermission, requestPermission} = useCameraPermission();
+  const pendingRead = useRef<{value: string; count: number}>({value: '', count: 0});
 
   const nextUnit: Unit | null = units
     ? (units.filter(u => !u.assignment_status && !u.is_skipped).sort((a, b) => a.sequence - b.sequence)[0] ?? null)
@@ -48,6 +52,9 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
     setConfirm(null);
     setAlreadyDeployed(null);
     setNotFound(null);
+    setShowManualEntry(false);
+    setManualValue('');
+    pendingRead.current = {value: '', count: 0};
     getUnits(activeUpload.upload_id)
       .then(data => {
         setUnits(data);
@@ -58,9 +65,8 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
       .finally(() => setLoadingUnits(false));
   }, [activeUpload, navigation]));
 
-  const onCodeScanned = useCallback(async (codes: any[]) => {
-    if (scanned || loading || loadingUnits || !codes[0]?.value || !activeUpload) return;
-    const value = codes[0].value;
+  const performLookup = useCallback(async (value: string) => {
+    if (!activeUpload) return;
     setScanned(true);
     setLoading(true);
     try {
@@ -91,7 +97,30 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
         Alert.alert('Error', 'Failed to look up barcode. Check your connection.');
       }
     }
-  }, [scanned, loading, loadingUnits, activeUpload, nextUnit, navigation]);
+  }, [activeUpload, nextUnit, navigation]);
+
+  // 1D barcodes can misread on a single frame (dropped/swapped digits), so
+  // require the same value on two consecutive frames before accepting it.
+  const onCodeScanned = useCallback((codes: any[]) => {
+    if (scanned || loading || loadingUnits || !codes[0]?.value || !activeUpload) return;
+    const value = codes[0].value;
+    if (pendingRead.current.value === value) {
+      pendingRead.current.count += 1;
+    } else {
+      pendingRead.current = {value, count: 1};
+    }
+    if (pendingRead.current.count < 2) return;
+    pendingRead.current = {value: '', count: 0};
+    performLookup(value);
+  }, [scanned, loading, loadingUnits, activeUpload, performLookup]);
+
+  const submitManualEntry = useCallback(() => {
+    const value = manualValue.trim();
+    if (!value) return;
+    setShowManualEntry(false);
+    setManualValue('');
+    performLookup(value);
+  }, [manualValue, performLookup]);
 
   const handleSkipNext = useCallback(() => {
     if (!activeUpload || !nextUnit) return;
@@ -148,14 +177,35 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
         <View style={styles.messageBody}>
           <Text style={styles.warnLabel}>BARCODE NOT FOUND</Text>
           <Text style={styles.messageText}>
-            {'The code "' + notFound + '" does not match any unit in this upload. Check the sticker or try rescanning.'}
+            {'The code "' + notFound + '" does not match any unit in this upload. This is often a misread — try rescanning, or enter the code manually.'}
           </Text>
+          {showManualEntry ? (
+            <View style={styles.manualEntryRow}>
+              <TextInput
+                style={styles.manualInput}
+                value={manualValue}
+                onChangeText={setManualValue}
+                placeholder="Enter barcode"
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                autoFocus
+              />
+              <TouchableOpacity style={styles.manualSubmitBtn} onPress={submitManualEntry}>
+                <Text style={styles.manualSubmitText}>Go</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => setShowManualEntry(true)}>
+              <Text style={styles.manualLink}>Enter code manually</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.confirmButtons}>
           <TouchableOpacity style={styles.confirmBtn} onPress={handleSkipNext}>
             <Text style={styles.confirmBtnText}>Skip Unit</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.confirmBtn} onPress={() => { setNotFound(null); setScanned(false); }}>
+          <TouchableOpacity style={styles.confirmBtn} onPress={() => { setNotFound(null); setScanned(false); setShowManualEntry(false); setManualValue(''); }}>
             <Text style={styles.confirmBtnText}>Rescan</Text>
           </TouchableOpacity>
         </View>
@@ -242,6 +292,29 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
         </View>
         <Text style={styles.frameHint}>Place the code inside this frame</Text>
       </View>
+      {!loading && (
+        showManualEntry ? (
+          <View style={styles.manualEntryRow}>
+            <TextInput
+              style={styles.manualInput}
+              value={manualValue}
+              onChangeText={setManualValue}
+              placeholder="Enter barcode"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoFocus
+            />
+            <TouchableOpacity style={styles.manualSubmitBtn} onPress={submitManualEntry}>
+              <Text style={styles.manualSubmitText}>Go</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => setShowManualEntry(true)}>
+            <Text style={[styles.manualLink, styles.manualLinkCentered]}>Can't scan? Enter code manually</Text>
+          </TouchableOpacity>
+        )
+      )}
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
@@ -285,4 +358,11 @@ const styles = StyleSheet.create({
   bodyText: {color: 'rgba(255,255,255,0.85)', fontSize: 15, textAlign: 'center', marginBottom: 24, paddingHorizontal: 24},
   whiteBtn: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 56},
   whiteBtnText: {color: BG, fontSize: 16, fontWeight: '700'},
+  // Manual entry
+  manualLink: {color: '#fff', fontSize: 14, fontWeight: '600', textDecorationLine: 'underline'},
+  manualLinkCentered: {textAlign: 'center', marginTop: 16},
+  manualEntryRow: {flexDirection: 'row', gap: 10, marginTop: 12, alignItems: 'center'},
+  manualInput: {flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 16},
+  manualSubmitBtn: {backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 18, paddingVertical: 11},
+  manualSubmitText: {color: BG, fontSize: 15, fontWeight: '700'},
 });
