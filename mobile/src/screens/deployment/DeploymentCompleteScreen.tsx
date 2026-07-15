@@ -1,19 +1,34 @@
 import React, {useEffect} from 'react';
-import {Image, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Alert, Image, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {useSessionStore} from '../../store/sessionStore';
-import {runSync} from '../../services/syncService';
+import {getErroredQueueItems, runSync} from '../../services/syncService';
 
 const BG = '#0D7A8C';
 
 export const DeploymentCompleteScreen = ({navigation}: any) => {
-  const {selectedSite, units, setUnits} = useSessionStore();
+  const {selectedSite, activeUpload, units, setUnits} = useSessionStore();
 
   useEffect(() => {
     runSync();
   }, []);
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     runSync();
+    if (activeUpload) {
+      const errored = await getErroredQueueItems(activeUpload.upload_id);
+      if (errored.length > 0) {
+        const names = errored.map(e => units?.find(u => u.unit_id === e.unitId)?.unit_name || e.unitId).join(', ');
+        Alert.alert(
+          'Unsent Data',
+          `${errored.length} item(s) could not be sent and won't be retried automatically: ${names}. Contact your admin to resolve these before this site's data is considered complete.`,
+          [
+            {text: 'Go Back', style: 'cancel'},
+            {text: 'Complete Anyway', style: 'destructive', onPress: () => navigation.navigate('SiteSelection')},
+          ],
+        );
+        return;
+      }
+    }
     navigation.navigate('SiteSelection');
   };
 

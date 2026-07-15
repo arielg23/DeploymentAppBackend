@@ -142,6 +142,20 @@ export const getQueuedUnitStatus = async (uploadId: string): Promise<{assignedUn
   };
 };
 
+export type ErroredQueueItem = {unitId: string; kind: 'assignment' | 'skip'};
+
+// Items that exhausted their retries and will NOT be sent by the background sync
+// loop anymore. Surfaced explicitly (e.g. before "Complete Site") since they'd
+// otherwise silently vanish from the technician's view.
+export const getErroredQueueItems = async (uploadId: string): Promise<ErroredQueueItem[]> => {
+  const assignments = await database.get<QueuedAssignment>('queued_assignments').query().fetch();
+  const skips = await database.get<QueuedSkip>('queued_skips').query().fetch();
+  return [
+    ...assignments.filter(a => a.uploadId === uploadId && a.status === 'ERROR').map(a => ({unitId: a.unitId, kind: 'assignment' as const})),
+    ...skips.filter(s => s.uploadId === uploadId && s.status === 'ERROR').map(s => ({unitId: s.unitId, kind: 'skip' as const})),
+  ];
+};
+
 export const updateCounts = async () => {
   const assignments = await database.get<QueuedAssignment>('queued_assignments').query().fetch();
   useSyncStore.getState().setPendingCount(assignments.filter(a => a.status === 'PENDING').length);
