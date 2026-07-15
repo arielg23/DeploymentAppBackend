@@ -7,10 +7,10 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from models.site import Site
 
 REQUIRED_HEADERS = ["unit_id", "unit_name", "sequence"]
-OPTIONAL_HEADERS = ["barcode", "customer_name", "customer_id", "site_name"]
+OPTIONAL_HEADERS = ["barcode", "customer_name", "customer_id", "site_id", "site_name"]
 ALL_HEADERS = REQUIRED_HEADERS + OPTIONAL_HEADERS
 
-EXAMPLE_ROW = ["UNIT16538", "Unit 1", 1, "AA000034", "Acme Corp", "CUST-001", "Acme HQ"]
+EXAMPLE_ROW = ["UNIT16538", "Unit 1", 1, "AA000034", "Acme Corp", "CUST-001", "SITE-001", "Acme HQ"]
 
 REQUIRED_FILL = PatternFill(start_color="D9E8FF", end_color="D9E8FF", fill_type="solid")
 HEADER_FONT = Font(bold=True)
@@ -41,15 +41,17 @@ def generate_unit_template(sites: list[Site]) -> bytes:
         for site in sites:
             ref.append([site.site_name, site.site_id])
         ref.sheet_state = "hidden"
+        last_row = len(sites) + 1
 
-        site_name_col_letter = ws.cell(row=1, column=ALL_HEADERS.index("site_name") + 1).column_letter
-        dv = DataValidation(
-            type="list",
-            formula1=f"'Sites (reference)'!$A$2:$A${len(sites) + 1}",
-            allow_blank=True,
-        )
-        ws.add_data_validation(dv)
-        dv.add(f"{site_name_col_letter}2:{site_name_col_letter}1000")
+        for header, ref_col in (("site_name", "A"), ("site_id", "B")):
+            col_letter = ws.cell(row=1, column=ALL_HEADERS.index(header) + 1).column_letter
+            dv = DataValidation(
+                type="list",
+                formula1=f"'Sites (reference)'!${ref_col}$2:${ref_col}${last_row}",
+                allow_blank=True,
+            )
+            ws.add_data_validation(dv)
+            dv.add(f"{col_letter}2:{col_letter}1000")
 
     buf = io.BytesIO()
     wb.save(buf)
