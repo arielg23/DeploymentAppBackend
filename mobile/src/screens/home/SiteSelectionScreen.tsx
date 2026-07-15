@@ -28,7 +28,7 @@ export const SiteSelectionScreen = ({navigation}: any) => {
 
   useEffect(() => {
     getSites()
-      .then(setSites)
+      .then(data => setSites(data.filter(s => s.active_upload_id)))
       .catch(() => Alert.alert('Error', 'Failed to load sites'))
       .finally(() => setLoading(false));
   }, []);
@@ -42,10 +42,6 @@ export const SiteSelectionScreen = ({navigation}: any) => {
 
   const handleContinue = useCallback(async () => {
     if (!selected) return;
-    if (!selected.active_upload_id) {
-      Alert.alert('No Active Deployment', 'This site has no active upload. Contact your admin.');
-      return;
-    }
     setConfirming(true);
     try {
       const upload = await getActiveUpload(selected.site_id);
@@ -101,9 +97,6 @@ export const SiteSelectionScreen = ({navigation}: any) => {
               <Text style={[styles.siteRowText, selected && selected.site_id === item.site_id && styles.siteRowTextSelected]}>
                 {item.site_name}
               </Text>
-              {!item.active_upload_id && (
-                <Text style={styles.inactiveBadge}>INACTIVE</Text>
-              )}
             </TouchableOpacity>
           )}
           ListEmptyComponent={
@@ -145,7 +138,6 @@ const styles = StyleSheet.create({
   siteRowSelected: {backgroundColor: '#fff'},
   siteRowText: {flex: 1, fontSize: 15, color: '#fff', fontWeight: '500'},
   siteRowTextSelected: {color: BG, fontWeight: '700'},
-  inactiveBadge: {fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.5)'},
   empty: {color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: 20},
   buttonRow: {alignItems: 'center', paddingVertical: 28},
   button: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 56},

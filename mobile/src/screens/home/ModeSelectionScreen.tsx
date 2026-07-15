@@ -24,7 +24,7 @@ export const ModeSelectionScreen = ({navigation}: any) => {
   const {selectedSite, setMode} = useSessionStore();
   const {conflictCount} = useSyncStore();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<AppMode | null>(null);
+  const [selectedMode, setSelectedMode] = useState<AppMode | null>('deployment');
 
   const handleContinue = () => {
     if (!selectedMode) return;
@@ -53,9 +53,7 @@ export const ModeSelectionScreen = ({navigation}: any) => {
           {'Mode: ' + MODE_OPTIONS.find(m => m.mode === selectedMode)?.label}
         </Text>
       )}
-      {!selectedMode && (
-        <Text style={styles.hint}>Tap {'\u2261'} to select a mode</Text>
-      )}
+      <Text style={styles.hint}>Tap {'\u2261'} to change a mode</Text>
 
       {conflictCount > 0 && (
         <TouchableOpacity style={styles.conflictBanner} onPress={() => navigation.navigate('ConflictList')}>

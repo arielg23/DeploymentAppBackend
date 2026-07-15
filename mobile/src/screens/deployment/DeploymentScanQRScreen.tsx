@@ -196,7 +196,7 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity onPress={() => setShowManualEntry(true)}>
+            <TouchableOpacity onPress={() => { setManualValue(notFound || ''); setShowManualEntry(true); }}>
               <Text style={styles.manualLink}>Enter code manually</Text>
             </TouchableOpacity>
           )}

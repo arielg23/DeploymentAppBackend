@@ -25,7 +25,7 @@ const TopBar = () => (
 
 export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
   const {unitId, unitName, siteId} = route.params as {unitId: string; unitName: string; siteId: string};
-  const {selectedSite, activeUpload} = useSessionStore();
+  const {selectedSite, activeUpload, units} = useSessionStore();
   const [state, setState] = useState<ScreenState>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
   const [conflictUnit, setConflictUnit] = useState<string | null>(null);
@@ -50,13 +50,15 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
       });
       setState('success');
     } catch (e: any) {
-      if (e?.response?.status === 409 && e?.response?.data?.conflict_type === 'dev_eui') {
-        setConflictUnit(e.response.data.existing?.unit_id || 'another unit');
+      const responseDetail = e?.response?.data?.detail;
+      if (e?.response?.status === 409 && responseDetail?.conflict_type === 'dev_eui') {
+        const conflictUnitId = responseDetail.existing?.unit_id;
+        const friendlyName = units?.find(u => u.unit_id === conflictUnitId)?.unit_name;
+        setConflictUnit(friendlyName || conflictUnitId || 'another unit');
+      } else if (e?.response?.status === 409 && responseDetail?.conflict_type === 'unit') {
+        setErrorMsg('This unit was already assigned by another technician.');
       } else {
-        const detail = e?.response?.data?.detail;
-        const msg = detail
-          ? typeof detail === 'string' ? detail : JSON.stringify(detail)
-          : e?.message || 'An unexpected error occurred.';
+        const msg = typeof responseDetail === 'string' ? responseDetail : e?.message || 'An unexpected error occurred.';
         setErrorMsg(msg);
       }
       setState('error');
