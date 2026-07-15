@@ -6,17 +6,32 @@ import {runSync} from '../../services/syncService';
 const BG = '#0D7A8C';
 
 export const DeploymentCompleteScreen = ({navigation}: any) => {
-  const {selectedSite} = useSessionStore();
+  const {selectedSite, units, setUnits} = useSessionStore();
 
   useEffect(() => {
     runSync();
   }, []);
 
+  const handleComplete = () => {
+    runSync();
+    navigation.navigate('SiteSelection');
+  };
+
+  const handleReview = () => {
+    runSync();
+    // Bring skipped units back into the pending pool so DeploymentScanQR picks
+    // up the lowest-sequence undeployed unit next.
+    if (units) {
+      setUnits(units.map(u => (u.is_skipped ? {...u, is_skipped: false} : u)));
+    }
+    navigation.navigate('DeploymentScanQR');
+  };
+
   return (
     <View style={styles.container}>
       {/* Top bar */}
       <View style={styles.topBar}>
-        <Text style={styles.hamburger}>{'\u2261'}</Text>
+        <Text style={styles.hamburger}>{'≡'}</Text>
         <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
         <View style={styles.topBarSpacer} />
       </View>
@@ -26,11 +41,12 @@ export const DeploymentCompleteScreen = ({navigation}: any) => {
 
       <Text style={styles.heading}>{'Deployment for Site\nComplete'}</Text>
 
-      <View style={styles.bottomRow}>
-        <TouchableOpacity
-          style={styles.whiteBtn}
-          onPress={() => navigation.navigate('SiteSelection')}>
-          <Text style={styles.whiteBtnText}>Next Site</Text>
+      <View style={styles.bottomButtons}>
+        <TouchableOpacity style={styles.outlineBtn} onPress={handleReview}>
+          <Text style={styles.outlineBtnText}>Review Undeployed Units</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.whiteBtn} onPress={handleComplete}>
+          <Text style={styles.whiteBtnText}>Complete Site</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -46,7 +62,9 @@ const styles = StyleSheet.create({
   title: {fontSize: 20, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 2},
   siteName: {fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 28},
   heading: {fontSize: 24, fontWeight: '700', color: '#fff', paddingHorizontal: 24, lineHeight: 32},
-  bottomRow: {position: 'absolute', bottom: 48, right: 24},
-  whiteBtn: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 32},
+  bottomButtons: {position: 'absolute', bottom: 48, left: 24, right: 24, gap: 12},
+  whiteBtn: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, alignItems: 'center'},
   whiteBtnText: {color: BG, fontSize: 16, fontWeight: '700'},
+  outlineBtn: {borderWidth: 2, borderColor: '#fff', borderRadius: 24, paddingVertical: 14, alignItems: 'center'},
+  outlineBtnText: {color: '#fff', fontSize: 16, fontWeight: '700'},
 });

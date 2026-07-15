@@ -133,6 +133,15 @@ const scheduleRetry = (delayMs: number) => {
   syncTimeout = setTimeout(runSync, delayMs);
 };
 
+export const getQueuedUnitStatus = async (uploadId: string): Promise<{assignedUnitIds: Set<string>; skippedUnitIds: Set<string>}> => {
+  const assignments = await database.get<QueuedAssignment>('queued_assignments').query().fetch();
+  const skips = await database.get<QueuedSkip>('queued_skips').query().fetch();
+  return {
+    assignedUnitIds: new Set(assignments.filter(a => a.uploadId === uploadId && a.status !== 'ERROR').map(a => a.unitId)),
+    skippedUnitIds: new Set(skips.filter(s => s.uploadId === uploadId && s.status !== 'ERROR').map(s => s.unitId)),
+  };
+};
+
 export const updateCounts = async () => {
   const assignments = await database.get<QueuedAssignment>('queued_assignments').query().fetch();
   useSyncStore.getState().setPendingCount(assignments.filter(a => a.status === 'PENDING').length);

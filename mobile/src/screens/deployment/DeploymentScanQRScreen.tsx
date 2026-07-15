@@ -13,7 +13,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import {Camera, useCameraDevice, useCameraPermission, useCodeScanner} from 'react-native-vision-camera';
 import {useSessionStore} from '../../store/sessionStore';
 import {getUnits, lookupByBarcode} from '../../api/sites';
-import {enqueueSkip, runSync} from '../../services/syncService';
+import {enqueueSkip, getQueuedUnitStatus, runSync} from '../../services/syncService';
 import type {Unit} from '../../types';
 
 const BG = '#0D7A8C';
@@ -57,9 +57,19 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
     setManualValue('');
     pendingRead.current = {value: '', count: 0};
     getUnits(activeUpload.upload_id)
-      .then(data => {
-        setUnits(data);
-        const allDone = data.length > 0 && !data.find(u => !u.assignment_status && !u.is_skipped);
+      .then(async data => {
+        // Overlay locally-queued-but-not-yet-synced items — a unit just deployed or
+        // skipped offline won't be reflected by the server yet, so without this the
+        // app would show it as pending again.
+        const {assignedUnitIds, skippedUnitIds} = await getQueuedUnitStatus(activeUpload.upload_id);
+        const merged = data.map(u => {
+          if (u.assignment_status) return u;
+          if (assignedUnitIds.has(u.unit_id)) return {...u, assignment_status: 'QUEUED' as const};
+          if (skippedUnitIds.has(u.unit_id)) return {...u, is_skipped: true};
+          return u;
+        });
+        setUnits(merged);
+        const allDone = merged.length > 0 && !merged.find(u => !u.assignment_status && !u.is_skipped);
         if (allDone) navigation.navigate('DeploymentComplete');
       })
       .catch(() => Alert.alert('Error', 'Failed to load units'))
@@ -297,29 +307,6 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
         </View>
         <Text style={styles.frameHint}>Place the code inside this frame</Text>
       </View>
-      {!loading && (
-        showManualEntry ? (
-          <View style={styles.manualEntryRow}>
-            <TextInput
-              style={styles.manualInput}
-              value={manualValue}
-              onChangeText={setManualValue}
-              placeholder="Enter barcode"
-              placeholderTextColor="rgba(255,255,255,0.6)"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              autoFocus
-            />
-            <TouchableOpacity style={styles.manualSubmitBtn} onPress={submitManualEntry}>
-              <Text style={styles.manualSubmitText}>Go</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => setShowManualEntry(true)}>
-            <Text style={[styles.manualLink, styles.manualLinkCentered]}>Can't scan? Enter code manually</Text>
-          </TouchableOpacity>
-        )
-      )}
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#fff" />
@@ -365,7 +352,6 @@ const styles = StyleSheet.create({
   whiteBtnText: {color: BG, fontSize: 16, fontWeight: '700'},
   // Manual entry
   manualLink: {color: '#fff', fontSize: 14, fontWeight: '600', textDecorationLine: 'underline'},
-  manualLinkCentered: {textAlign: 'center', marginTop: 16},
   manualEntryRow: {flexDirection: 'row', gap: 10, marginTop: 12, alignItems: 'center'},
   manualInput: {flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 16},
   manualSubmitBtn: {backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 18, paddingVertical: 11},
