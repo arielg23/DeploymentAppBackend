@@ -1,11 +1,16 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import {Image, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {useSessionStore} from '../../store/sessionStore';
+import {runSync} from '../../services/syncService';
 
 const BG = '#0D7A8C';
 
 export const DeploymentCompleteScreen = ({navigation}: any) => {
   const {selectedSite} = useSessionStore();
+
+  useEffect(() => {
+    runSync();
+  }, []);
 
   return (
     <View style={styles.container}>

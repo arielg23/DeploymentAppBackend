@@ -8,9 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import {useSessionStore} from '../../store/sessionStore';
 import {readNfcTag, cancelNfcRead, initNfc} from '../../services/nfc';
-import {submitAssignment, submitSkip} from '../../api/sites';
+import {submitAssignment} from '../../api/sites';
+import {normalizeDevEui} from '../../services/deveui';
+import {enqueueAssignment, enqueueSkip, runSync} from '../../services/syncService';
 
 const BG = '#0D7A8C';
 type ScreenState = 'scanning' | 'assigning' | 'success' | 'error';
@@ -29,6 +32,7 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
   const [state, setState] = useState<ScreenState>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
   const [conflictUnit, setConflictUnit] = useState<string | null>(null);
+  const [queuedOffline, setQueuedOffline] = useState(false);
   const scanning = useRef(false);
 
   const startScan = useCallback(async () => {
@@ -37,35 +41,64 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
     setState('scanning');
     setErrorMsg('');
     setConflictUnit(null);
+    setQueuedOffline(false);
     try {
       await initNfc();
       const devEui = await readNfcTag();
       setState('assigning');
       if (!activeUpload) throw new Error('No active upload');
-      await submitAssignment(activeUpload.upload_id, {
-        site_id: siteId,
-        unit_id: unitId,
-        dev_eui_raw: devEui,
-        timestamp_local: new Date().toISOString(),
+      const timestampLocal = new Date().toISOString();
+      const netState = await NetInfo.fetch();
+
+      if (netState.isConnected) {
+        try {
+          await submitAssignment(activeUpload.upload_id, {
+            site_id: siteId,
+            unit_id: unitId,
+            dev_eui_raw: devEui,
+            timestamp_local: timestampLocal,
+          });
+          setState('success');
+          return;
+        } catch (e: any) {
+          if (e?.response?.status === 409) {
+            const responseDetail = e?.response?.data?.detail;
+            if (responseDetail?.conflict_type === 'dev_eui') {
+              const conflictUnitId = responseDetail.existing?.unit_id;
+              const friendlyName = units?.find(u => u.unit_id === conflictUnitId)?.unit_name;
+              setConflictUnit(friendlyName || conflictUnitId || 'another unit');
+            } else {
+              setErrorMsg('This unit was already assigned by another technician.');
+            }
+            setState('error');
+            return;
+          }
+          // Not a conflict (e.g. connection dropped mid-request) — fall through and queue it.
+        }
+      }
+
+      // Offline, or the live attempt failed for a non-conflict reason: save locally and
+      // let the background sync service deliver it once connectivity is available.
+      await enqueueAssignment({
+        uploadId: activeUpload.upload_id,
+        siteId,
+        unitId,
+        devEuiRaw: devEui,
+        devEuiNormalized: normalizeDevEui(devEui),
+        timestampLocal,
       });
+      runSync();
+      setQueuedOffline(true);
       setState('success');
     } catch (e: any) {
       const responseDetail = e?.response?.data?.detail;
-      if (e?.response?.status === 409 && responseDetail?.conflict_type === 'dev_eui') {
-        const conflictUnitId = responseDetail.existing?.unit_id;
-        const friendlyName = units?.find(u => u.unit_id === conflictUnitId)?.unit_name;
-        setConflictUnit(friendlyName || conflictUnitId || 'another unit');
-      } else if (e?.response?.status === 409 && responseDetail?.conflict_type === 'unit') {
-        setErrorMsg('This unit was already assigned by another technician.');
-      } else {
-        const msg = typeof responseDetail === 'string' ? responseDetail : e?.message || 'An unexpected error occurred.';
-        setErrorMsg(msg);
-      }
+      const msg = typeof responseDetail === 'string' ? responseDetail : e?.message || 'An unexpected error occurred.';
+      setErrorMsg(msg);
       setState('error');
     } finally {
       scanning.current = false;
     }
-  }, [activeUpload, siteId, unitId]);
+  }, [activeUpload, siteId, unitId, units]);
 
   useEffect(() => {
     startScan();
@@ -79,7 +112,8 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
         text: 'Skip', style: 'destructive', onPress: async () => {
           try {
             if (activeUpload) {
-              await submitSkip(activeUpload.upload_id, {site_id: siteId, unit_id: unitId});
+              await enqueueSkip({uploadId: activeUpload.upload_id, siteId, unitId, timestampLocal: new Date().toISOString()});
+              runSync();
             }
           } catch {}
           navigation.navigate('DeploymentScanQR');
@@ -117,8 +151,14 @@ export const DeploymentScanNFCScreen = ({route, navigation}: any) => {
       {state === 'success' && (
         <>
           <Text style={styles.bodyText}>NFC ID Detected</Text>
-          <Text style={styles.bodyText}>{'Lock is associated with ' + unitName}</Text>
-          <View style={styles.centreBottom}>
+          <Text style={styles.bodyText}>Lock has been associated with</Text>
+          <View style={styles.unitBox}>
+            <Text style={styles.unitBoxText}>{unitName}</Text>
+          </View>
+          {queuedOffline && (
+            <Text style={styles.hintText}>Saved offline — will sync automatically when connected</Text>
+          )}
+          <View style={styles.bottomRowRight}>
             <TouchableOpacity
               style={styles.continueBtn}
               onPress={() => navigation.navigate('DeploymentScanQR')}>
@@ -173,7 +213,7 @@ const styles = StyleSheet.create({
   unitBoxText: {fontSize: 26, fontWeight: '800', color: '#fff', textAlign: 'center'},
   errorLabel: {fontSize: 16, fontWeight: '800', color: '#FF4444', paddingHorizontal: 24, marginTop: 12, marginBottom: 4},
   errorText: {fontSize: 15, color: '#fff', paddingHorizontal: 24, lineHeight: 22},
-  centreBottom: {position: 'absolute', bottom: 48, left: 0, right: 0, alignItems: 'center'},
+  bottomRowRight: {position: 'absolute', bottom: 48, right: 24},
   continueBtn: {backgroundColor: '#fff', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 56},
   continueBtnText: {color: BG, fontSize: 16, fontWeight: '700'},
   errorButtons: {position: 'absolute', bottom: 48, left: 24, right: 24, flexDirection: 'row', gap: 16},

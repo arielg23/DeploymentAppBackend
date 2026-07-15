@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import {getActiveUpload, getSites} from '../../api/sites';
 import {useSessionStore} from '../../store/sessionStore';
+import {runSync} from '../../services/syncService';
 import type {Site} from '../../types';
 
 const BG = '#0D7A8C';
@@ -27,6 +28,7 @@ export const SiteSelectionScreen = ({navigation}: any) => {
   const {setSite, setUpload} = useSessionStore();
 
   useEffect(() => {
+    runSync();
     getSites()
       .then(data => setSites(data.filter(s => s.active_upload_id)))
       .catch(() => Alert.alert('Error', 'Failed to load sites'))

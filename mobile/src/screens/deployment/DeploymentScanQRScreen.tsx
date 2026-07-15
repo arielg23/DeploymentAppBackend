@@ -12,7 +12,8 @@ import {
 import {useFocusEffect} from '@react-navigation/native';
 import {Camera, useCameraDevice, useCameraPermission, useCodeScanner} from 'react-native-vision-camera';
 import {useSessionStore} from '../../store/sessionStore';
-import {getUnits, lookupByBarcode, submitSkip} from '../../api/sites';
+import {getUnits, lookupByBarcode} from '../../api/sites';
+import {enqueueSkip, runSync} from '../../services/syncService';
 import type {Unit} from '../../types';
 
 const BG = '#0D7A8C';
@@ -67,6 +68,7 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
 
   const performLookup = useCallback(async (value: string) => {
     if (!activeUpload) return;
+    setNotFound(null);
     setScanned(true);
     setLoading(true);
     try {
@@ -129,11 +131,14 @@ export const DeploymentScanQRScreen = ({navigation}: any) => {
       {
         text: 'Skip', style: 'destructive', onPress: async () => {
           try {
-            await submitSkip(activeUpload.upload_id, {site_id: nextUnit.site_id, unit_id: nextUnit.unit_id});
+            await enqueueSkip({uploadId: activeUpload.upload_id, siteId: nextUnit.site_id, unitId: nextUnit.unit_id, timestampLocal: new Date().toISOString()});
+            runSync();
           } catch {}
           setNotFound(null);
           setScanned(false);
-          getUnits(activeUpload.upload_id).then(setUnits).catch(() => {});
+          // Update locally rather than refetching — the skip may still be queued
+          // (offline) and a server refetch would show it as pending again.
+          setUnits((units ?? []).map(u => u.unit_id === nextUnit.unit_id ? {...u, is_skipped: true} : u));
         },
       },
     ]);
